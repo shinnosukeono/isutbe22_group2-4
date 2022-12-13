@@ -9,11 +9,11 @@
 #define Y 1
 
 //先手、後手の表現（先手が下になっているのであとで考慮が必要）
-#define FIRST 0
-#define SECOND 1
+#define FIRST 1  //**
+#define SECOND -1//**
 
 //自分の手番
-#define myTURN 0
+#define myTURN 1 //**
 
 //駒の表現（後手の駒は+11する）
 #define OUT_OF_BOARD 100
@@ -68,12 +68,16 @@ void commitFoul(int turn) {
 
 //それは自分の駒か？
 bool isSelf(int koma, int turn) {
-    return ((turn * ENEMY) + OU <= koma && koma <= (turn * ENEMY) + TO);
+    if (turn == FIRST){
+        return (OU <= koma && koma <= TO); //**
+    }else{
+        return (OU + ENEMY <= koma && koma <= TO + ENEMY); //**
+    }
 }
 
 //それは相手の駒か？
 bool isEnemy(int koma, int turn) {
-    int rev = (turn + 1) % 2; //自分と相手の手番をひっくり返す
+    int rev = (-1) * turn; //自分と相手の手番をひっくり返す //**
     return isSelf(koma, rev);
 }
 
@@ -163,7 +167,7 @@ bool canJump(Move t, Kyokumen K, int turn) {
     case 9: //成銀
     case 10: //と金
     case 3: //金
-        if (turn == 0) { //先手
+        if (turn == FIRST) { //先手
             if ((dify == 1 && (difx == 1 || difx == 0 || difx == -1)) ||
                 (dify == 0 && (difx == 1 || difx == -1)) ||
                 (dify == -1 && difx == 0) && !self)
@@ -176,7 +180,7 @@ bool canJump(Move t, Kyokumen K, int turn) {
         }
         break;
     case 4: //銀
-        if (turn == 0) { //先手
+        if (turn == FIRST) { //先手
             if ((dify == 1 && (difx == 1 || difx == 0 || difx == -1)) ||
                 (dify == -1 && (difx == 1 || difx == -1)) && !self)
                 return true;
@@ -187,7 +191,7 @@ bool canJump(Move t, Kyokumen K, int turn) {
         }
         break;
     case 5: //歩
-        if (turn == 0) { //先手
+        if (turn == FIRST) { //先手
             if (t.to.y == 5 && t.promote != 1) //成らないのは反則
                 break;
             if (dify == 1 && difx == 0 && !self)
@@ -209,7 +213,7 @@ bool canJump(Move t, Kyokumen K, int turn) {
 //成れるか？
 bool canPromote(Move t, Kyokumen K, int turn) {
     int type = K.Board[t.from.x][t.from.y] % ENEMY; //駒の種類
-    bool cond = ((turn == 0 && (t.from.y == 5 || t.to.y == 5)) || (turn == 1 && (t.from.y == 1 || t.to.y == 1))); //盤面の制約
+    bool cond = ((turn == FIRST && (t.from.y == 5 || t.to.y == 5)) || (turn == SECOND && (t.from.y == 1 || t.to.y == 1))); //盤面の制約 //**
 
     switch (type)
     {
@@ -239,10 +243,16 @@ bool isWaiting(Kyokumen K, int turn, Move *res) {
     //自分の王の場所を探す
     for (int i = 1; i <= 5; i++) {
         for (int j = 1; j <= 5; j++) {
-            if (K.Board[i][j] == OU + (turn * ENEMY)) {
+            if (turn == FIRST && K.Board[i][j] == OU ) { //**
                 t.to.x = i;
                 t.to.y = j;
             }
+            //**
+            if (turn == SECOND && K.Board[i][j] == OU + ENEMY){
+                t.to.x = i;
+                t.to.y = j;
+            }
+            //**
         }
     }
 
@@ -252,7 +262,7 @@ bool isWaiting(Kyokumen K, int turn, Move *res) {
                 t.from.x = i;
                 t.from.y = j;
                 t.promote = 1; //canJumpが歩の成る成らないの判定を含んでしまっているので、promote=1として回避（他の手には関係ない）
-                if (canJump(t, K, (turn + 1) % 2)) { //相手の駒が相手の手で自分の王に飛べるなら
+                if (canJump(t, K, (-1) * turn)) { //相手の駒が相手の手で自分の王に飛べるなら
                     res[cnt++] = t; //その手を記憶
                     judge =  true; //それは王手
                 }
@@ -324,19 +334,31 @@ Kyokumen makeMove(const char *s, Move *t, Kyokumen K, int turn) {
     if (t->from.x == 0) { //駒を打つとき
         if (t->koma == EMPTY) //存在しない駒（反則）
             commitFoul(turn);
-        if (K.Reserve[turn][t->koma] == 0) { //その駒は持っていない（反則）
+        if (turn == FIRST && K.Reserve[0][t->koma] == 0) { //その駒は持っていない（反則）//**
             commitFoul(turn);
+        } else if (turn == SECOND && K.Reserve[1][t->koma] == 0) { //**
+            commitFoul(turn); //**
         } else if (K.Board[t->to.x][t->to.y] != EMPTY) { //すでに駒がある（反則）
             commitFoul(turn);
         } else {
             if (t->koma == FU) { // 二歩の判定
                 for (int i = 0; i < 5; i++) {
-                    if (K.Board[t->to.x][i] == FU + (turn * ENEMY)) // 二歩
+                    if (turn == FIRST && K.Board[t->to.x][i] == FU) // 二歩 //**
                         commitFoul(turn);
+                    if (turn == SECOND && K.Board[t->to.x][i] == FU + ENEMY){ //**
+                        commitFoul(turn); //**
+                    }
                 }
             }
-            n_K.Reserve[turn][t->koma]--;                           // 駒を使用
-            n_K.Board[t->to.x][t->to.y] = t->koma + (turn * ENEMY); // 駒を置く
+            //**
+            if (turn == FIRST){
+                n_K.Reserve[0][t->koma]--;                           // 駒を使用
+                n_K.Board[t->to.x][t->to.y] = t->koma;               // 駒を置く
+            }else{
+                n_K.Reserve[1][t->koma]--;                           
+                n_K.Board[t->to.x][t->to.y] = t->koma + ENEMY;
+            }
+            //**
         }
     } else { //駒を動かすとき
         if (!isSelf(K.Board[t->from.x][t->from.y], turn)) //そこに自分の駒はない（反則）
@@ -345,12 +367,21 @@ Kyokumen makeMove(const char *s, Move *t, Kyokumen K, int turn) {
             commitFoul(turn);
         } else {
             n_K.Board[t->from.x][t->from.y] = EMPTY;
-            if (K.Board[t->to.x][t->to.y] != EMPTY) //行き先に相手の駒があれば（自分の駒がないことはcanJumpで保証）
-                n_K.Reserve[turn][((K.Board[t->to.x][t->to.y] % ENEMY) - FU > 0) ? ((K.Board[t->to.x][t->to.y] % ENEMY)- FU) : K.Board[t->to.x][t->to.y] % ENEMY]++; //持ち駒に追加（成り駒だったらもとに戻す、相手の駒だったら自分の駒にする）
+            if (K.Board[t->to.x][t->to.y] != EMPTY) { //行き先に相手の駒があれば（自分の駒がないことはcanJumpで保証）
+                //**
+                if (turn == FIRST){
+                    n_K.Reserve[0][((K.Board[t->to.x][t->to.y] % ENEMY) - FU > 0) ? ((K.Board[t->to.x][t->to.y] % ENEMY)- FU) : K.Board[t->to.x][t->to.y] % ENEMY]++; //持ち駒に追加（成り駒だったらもとに戻す、相手の駒だったら自分の駒にする）
+                } else {
+                    n_K.Reserve[1][((K.Board[t->to.x][t->to.y] % ENEMY) - FU > 0) ? ((K.Board[t->to.x][t->to.y] % ENEMY)- FU) : K.Board[t->to.x][t->to.y] % ENEMY]++;
+                }
+                //**
+            }
             if (t->promote == 1) { //成る
-                if (canPromote(*t, K, turn)) //合法
+                if (canPromote(*t, K, turn)) {//合法
                     n_K.Board[t->to.x][t->to.y] = K.Board[t->from.x][t->from.y] + 5;
-                else commitFoul(turn);
+                } else {
+                    commitFoul(turn);
+                }  
             } else { //成らない
                 n_K.Board[t->to.x][t->to.y] = K.Board[t->from.x][t->from.y]; // 駒を置く
             }
@@ -432,7 +463,13 @@ void printBoard(Kyokumen K, int turn, bool w) {
     }
 
     //手番の表示（王手をかけられているならそれも表示）
-    printf("NEXT: %s %s\n", turnCh[turn], w ? "王手" : "");
+    //**
+    if (turn == FIRST){
+        printf("NEXT: %s %s\n", turnCh[0], w ? "王手" : "");
+    }else{
+        printf("NEXT: %s %s\n", turnCh[1], w ? "王手" : "");
+    }
+    //**
 }
 
 int main() {
@@ -463,7 +500,7 @@ int main() {
         K[i + 1] = makeMove(s, &t[i], K[i], turn); //指し手を実行して新しい盤面に書き込み
         i++;
         winJudge(K[i], turn, res[turn]); //勝敗判定
-        turn = (turn + 1) % 2;               //手番を更新
+        turn = (-1) * turn;               //手番を更新
         w[turn] = isWaiting(K[i], turn, res[turn]); //王手の判定
         printBoard(K[i], turn, w[turn]);
     }
