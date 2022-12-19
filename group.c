@@ -171,7 +171,7 @@ bool canJump(Move t, Kyokumen K, int turn) {
             }
 
             if (difx == -dify) {
-                for (int i = 0; i < abs(dify); i++) {
+                for (int i = 1; i < abs(dify); i++) {
                     if (K.Board[min(t.from.x, t.to.x) + i][max(t.from.y, t.to.y) - i] != EMPTY) { //間に駒があれば
                         judge = false; //移動不可
                         break;
