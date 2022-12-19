@@ -289,6 +289,24 @@ bool isWaiting(Kyokumen *K, int turn, Move *res) {
     return judge;
 }
 
+//行きどころのない駒の有無の判定
+void freezingFU_Judge(Kyokumen *K, int turn){
+    if (turn == FIRST){
+        for (int i=1; i<=5; i++){
+            if (K->Board[i][5] == FU){
+                commitFoul(turn);
+            }
+        }
+    }else{
+        for (int i=1; i<=5; i++){
+            if (K->Board[i][1] == FU + ENEMY){
+                commitFoul(turn);
+            }
+        }
+    }
+    return;
+}
+
 //千日手判定
 void repJudge(Kyokumen *K, int i, int turn, Move *res) {
     int cnt = 1;
@@ -535,6 +553,7 @@ int main(int argc, char *argv[]) {
         scanf("%s", s); //指し手の入力
         K[i + 1] = makeMove(s, &t[i], K[i], turn); //指し手を実行して新しい盤面に書き込み
         i++;
+        //freezingFU_Judge(K+i, turn); //行きどころのない駒の有無を判定
         repJudge(K, i, turn, res[turn]); //千日手判定
         winJudge(K+i, turn, res[turn]); //勝敗判定
         turn = (-1) * turn;               //手番を更新
