@@ -13,7 +13,7 @@
 #define SECOND -1//**
 
 //自分の手番
-#define myTURN 1 //**
+int myTURN; //コマンドライン引数で実行時にセット
 
 //駒の表現（後手の駒は+11する）
 #define OUT_OF_BOARD 100
@@ -57,6 +57,23 @@ int min(int a, int b)
 int max(int a, int b)
 {
     return a < b ? b : a;
+}
+
+//Kyokumenが等価か比較（変更前のReserveを使っています！！）
+bool cmpKyokumen(Kyokumen K1, Kyokumen K2) {
+    for (int i = 0; i < 7; i++) {
+        for (int j = 0; j < 7; j++) {
+            if (K1.Board[i][j] != K2.Board[i][j]) return false;
+        }
+    }
+
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < FU + 1; j++) {
+            if (K1.Reserve[i][j] != K2.Reserve[i][j]) return false;
+        }
+    }
+
+    return true;
 }
 
 //反則処理
@@ -273,11 +290,27 @@ bool isWaiting(Kyokumen K, int turn, Move *res) {
     return judge;
 }
 
+//千日手判定
+void repJudge(Kyokumen *K, int i, int turn, Move *res) {
+    int cnt = 1;
+    while (cmpKyokumen(K[i], K[i - 4])) {
+        if (i < 4) break;
+        cnt++;
+        i -= 4;
+        if (cnt == 4) { //千日手成立
+            if (isWaiting(K[i], turn * (-1), res)) //連続王手のケース（自分が王手をかけ続けた）
+                commitFoul(turn); //自分の反則
+            if (isWaiting(K[i + 1], turn, res)) //連続王手のケース（自分が王手から逃げ続けた）
+                commitFoul(turn * (-1)); //相手の反則
+            else commitFoul(FIRST); //通常の千日手は先手の反則
+        }
+    }
+}
+
 //勝敗判定（王手をかけられたとき、それを回避する手を打たなかったら負け）
 void winJudge(Kyokumen K, int turn, Move *res) {
     if (isWaiting(K, turn, res)) commitFoul(turn);
 }
-
 
 // 指し手の入力をMove型に変換（反則の判定は別の関数でやる）
 void makeInstruction(const char *s, Move *t)
@@ -472,7 +505,8 @@ void printBoard(Kyokumen K, int turn, bool w) {
     //**
 }
 
-int main() {
+int main(int argc, char *argv[]) {
+    myTURN = (atoi(argv[1]) == 0 ? 1 : -1); //実行時引数が0なら1（先手）、それ以外なら-1（後手）に変換
     Kyokumen K[200]; //盤面
     Move t[200]; //150手分あればよいが、少し多めに用意
     Move res[2][20]; //王手の保存用（勝利判定に使う）。res[0]には先手が王手をかけられている手（つまり後手が指すと後手の勝ちになる手）が入るので注意。
@@ -499,6 +533,7 @@ int main() {
         scanf("%s", s); //指し手の入力
         K[i + 1] = makeMove(s, &t[i], K[i], turn); //指し手を実行して新しい盤面に書き込み
         i++;
+        repJudge(K, i, turn, res[turn]); //千日手判定
         winJudge(K[i], turn, res[turn]); //勝敗判定
         turn = (-1) * turn;               //手番を更新
         w[turn] = isWaiting(K[i], turn, res[turn]); //王手の判定
