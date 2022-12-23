@@ -32,8 +32,11 @@ int aiTURN;
 #define TO 10
 #define ENEMY 11
 
-#define DEPTH 10        // 探索深さ
+//AI用
+#define DEPTH 5        // 探索深さ
 #define INFTY (1 << 8) // 極端に大きな数
+int p[TO + 1] = {50, 11, 10, 9, 8, 1, 21, 20, 0, 9, 9};
+int p_hand[FU + 1] = {50, 12, 11, 10, 9, 5};
 
 //盤面
 typedef struct {
@@ -657,9 +660,42 @@ Kyokumen makeCand(Move *t, Kyokumen K, int turn, bool *flag)
 }
 
 // 評価関数
-int evaluationFunction(Kyokumen *K) {
-    srand((unsigned int)time(NULL));
-    return (rand() % 100 + 1); //評価値は乱数（AIはでたらめな手を指す）
+int evaluationFunction(Kyokumen K) {
+    int point_FIRST = 0, point_SECOND = 0;
+
+    for (int i = 0; i <= 5; i++) {
+        for (int j = 0; j <= 5; j++) {
+            if (isSelf(K.Board[i][j], aiTURN)) { //自分の駒だったら
+                if (aiTURN == FIRST) {
+                    point_FIRST += p[K.Board[i][j]];
+                } else {
+                    point_SECOND += p[K.Board[i][j] % ENEMY];
+                }
+            } else if (isEnemy(K.Board[i][j], aiTURN)) { //相手の駒だったら
+                if (aiTURN == FIRST) {
+                    point_SECOND += p[K.Board[i][j] % ENEMY];
+                } else {
+                    point_FIRST += p[K.Board[i][j]];
+                }
+            }
+        }
+    }
+
+    //ここから持ち駒
+
+    for (int i = OU; i <= FU; i++) {
+        while ((K.reserve_sente >> (2 * i)) % 4 != 0) {
+            point_FIRST += p_hand[i];
+            K.reserve_sente -= 1 << (2 * i);
+        }
+
+        while((K.reserve_gote >> (2 * i)) % 4 != 0) {
+            point_SECOND += p_hand[i];
+            K.reserve_gote -= 1 << (2 * i);
+        }
+    }
+
+    return (aiTURN == FIRST) ? (point_FIRST - point_SECOND) : (point_SECOND - point_FIRST);
 }
 
 // 可能な手（1手先）をすべて生成して配列にしまう（alpha-betaのcutが発生しやすくなるように手を並べられるか？）
@@ -769,7 +805,7 @@ int minLevel(Kyokumen *K, int turn, int alpha, int beta, int depth);
 int maxLevel(Kyokumen *K, int turn, int alpha, int beta, int depth)
 {
     if (depth == DEPTH)
-        return evaluationFunction(K); // 深さ制限に到達したら現在の局面の評価値を返す
+        return evaluationFunction(*K); // 深さ制限に到達したら現在の局面の評価値を返す
 
     int cnt = 0;
     
@@ -797,7 +833,7 @@ int maxLevel(Kyokumen *K, int turn, int alpha, int beta, int depth)
 int minLevel(Kyokumen *K, int turn, int alpha, int beta, int depth)
 {
     if (depth == DEPTH)
-        return evaluationFunction(K);
+        return evaluationFunction(*K);
 
     int cnt = 0;
 
